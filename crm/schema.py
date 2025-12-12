@@ -174,7 +174,8 @@ class OrderConnection(graphene.relay.Connection):
 class Query(graphene.ObjectType):
     # Customer queries with filtering
     customer = relay.Node.Field(CustomerType)
-    customer = graphene.List(CustomerType)
+    customer = graphene.Field(CustomerType)
+    
     all_customers = DjangoFilterConnectionField(
         CustomerType,
         filterset_class=CustomerFilter,
