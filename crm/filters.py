@@ -4,7 +4,7 @@ from django.db.models import Q
 import re
 from .models import Customer, Product, Order
 
-class CustomerFilter(filters.FilterSet):
+class CustomerFilter(django_filters.FilterSet):
     # Basic filters
     name = filters.CharFilter(lookup_expr='icontains', help_text="Filter by customer name (case-insensitive)")
     email = filters.CharFilter(lookup_expr='icontains', help_text="Filter by email (case-insensitive)")
