@@ -29,6 +29,7 @@ ALLOWED_HOSTS = []
 
 # Application definition
 INSTALLED_APPS = [
+    'crm',
     'graphene_django',
     'django_filters',
     'users.apps.UsersConfig',
@@ -38,10 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'crm',
-    'maahad',
-    'users',
-    'products',
+
 ]
 
 GRAPHENE = {
