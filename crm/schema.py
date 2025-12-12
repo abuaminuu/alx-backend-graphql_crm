@@ -24,6 +24,8 @@ class CustomerType(DjangoObjectType):
         interfaces = (relay.Node,)
         fields = "__all__"
         filterset_class = CustomerFilter
+
+    customer = graphene.List(CustomerType)
     
     # Custom computed fields
     order_count = graphene.Int()
