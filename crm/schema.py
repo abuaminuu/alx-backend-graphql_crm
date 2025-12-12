@@ -6,10 +6,11 @@ from graphene_django.filter import DjangoFilterConnectionField
 
 from .models import Customer, Product, Order
 from .mutations import (
-    CustomerType, ProductType, OrderType,
+    CustomerType, ProductType, OrderItem,
     CreateCustomer, BulkCreateCustomers,
     CreateProduct, CreateOrder
 )
+
 
 # Queries
 class Query(graphene.ObjectType):
@@ -19,9 +20,14 @@ class Query(graphene.ObjectType):
     product = relay.Node.Field(ProductType)
     all_products = DjangoFilterConnectionField(ProductType)
     
-    order = relay.Node.Field(OrderType)
-    all_orders = DjangoFilterConnectionField(OrderType)
+    order = relay.Node.Field(OrderItem)
+    all_orders = DjangoFilterConnectionField(OrderItem)
     
+    number = graphene.String(default_value="+234....")
+
+    def resolve_number(self, info):
+        return f"please call +354.... for care"
+
     # Custom resolvers
     def resolve_all_customers(self, info, **kwargs):
         return Customer.objects.all()

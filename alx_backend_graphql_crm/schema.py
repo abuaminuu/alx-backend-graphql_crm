@@ -1,18 +1,14 @@
+# graphql_crm/schema.py
 import graphene
+from crm.schema import Query as CRMQuery, Mutation as CRMMutation
 
-class Query(graphene.ObjectType):
-    hello = graphene.String(default_value="hello gQL!")
-    
+class Query(CRMQuery, graphene.ObjectType):
+    # You can add more queries from other apps here
+    # Example: from auth.schema import Query as AuthQuery
+    pass
 
-    def resolve_hello(self, info):
-        acc = "CSX-5648"
-        return f"hello, GraphQL! {acc}"
+class Mutation(CRMMutation, graphene.ObjectType):
+    # You can add more mutations from other apps here
+    pass
 
-    name = graphene.String(default_value="Name...")
-    
-    def resolve_name(self, info):
-        return f"i am xyx by name"
-
-
-# create schema instance
-schema = graphene.Schema(query=Query)
+schema = graphene.Schema(query=Query, mutation=Mutation)

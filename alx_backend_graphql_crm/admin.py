@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Product, Customer, Order, OrderItem
+from crm.models import Product, Customer, Order, OrderItem
 
 # register boiler plate 
 def register(model):
