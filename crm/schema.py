@@ -15,9 +15,52 @@ from .mutations import (
     CreateProduct, CreateOrder
 )
 
+
+class CreateCustomer(graphene.Mutation):
+    """Mutation to create a single customer"""
+    
+    class Arguments:
+        input = CustomerInput(required=True)
+    
+    Output = CustomerOutput
+    
+    @classmethod
+    def mutate(cls, root, info, input):
+        try:
+            # Validate email uniqueness
+            validate_unique_email(input.email)
+            
+            # Validate phone format if provided
+            if input.phone:
+                validate_phone_format(input.phone)
+            
+            # Create and save customer
+            customer = Customer(
+                name=input.name.strip(),
+                email=input.email.lower().strip(),
+                phone=input.phone.strip() if input.phone else None
+            )
+            
+            # Run Django model validation
+            customer.full_clean()
+            customer.save()
+            
+            return CustomerOutput(
+                customer=customer,
+                message="Customer created successfully"
+            )
+            
+        except DjangoValidationError as e:
+            # Extract first error message
+            error_msg = list(e.message_dict.values())[0][0]
+            raise CRMValidationError(error_msg)
+        except Exception as e:
+            raise GraphQLError(f"Failed to create customer: {str(e)}")
+
 # --------------------------
 # Object Types
 # --------------------------
+
 class CustomerType(DjangoObjectType):
     class Meta:
         model = Customer
@@ -26,7 +69,7 @@ class CustomerType(DjangoObjectType):
         filterset_class = CustomerFilter
 
     customer = graphene.List(CustomerType)
-    
+
     # Custom computed fields
     order_count = graphene.Int()
     total_spent = graphene.Float()
