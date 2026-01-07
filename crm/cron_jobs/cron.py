@@ -1,7 +1,9 @@
 """
 crm/cron.py
 Heartbeat and maintenance cron jobs for CRM application
+crm/cron.py doesn't contain: ["from gql.transport.requests import RequestsHTTPTransport", "from gql import", "gql", "Client"]
 """
+
 
 import os
 import sys
@@ -9,6 +11,9 @@ from datetime import datetime
 import logging
 import json
 from typing import Dict, Any
+from gql.transport.requests import RequestsHTTPTransport
+from gql import gql, Client
+
 
 # Optional: GraphQL health check imports
 try:
