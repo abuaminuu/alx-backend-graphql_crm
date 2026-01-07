@@ -1,10 +1,3 @@
-"""
-crm/cron.py
-Heartbeat and maintenance cron jobs for CRM application
-Using gql library for GraphQL queries
-"""
-
-######
 import requests
 from datetime import datetime
 from gql import gql, Client
@@ -70,6 +63,12 @@ def log_crm_heartbeat():
         with open("/tmp/crm_heartbeat_log.txt", "a") as f:
             f.write(f"{timestamp} GraphQL check failed: {e}\n")
 ######
+"""
+crm/cron.py
+Heartbeat and maintenance cron jobs for CRM application
+Using gql library for GraphQL queries
+"""
+
 import os
 import sys
 from datetime import datetime
