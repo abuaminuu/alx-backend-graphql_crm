@@ -1,7 +1,10 @@
 # Create the crontab file with exactly one line (no newline)
-printf "0 8 * * * cd /home/abuaminuu/machine/alx_travel_app_0x02 && /usr/bin/python3 crm/cron_jobs/send_order_reminders.py >> /tmp/cron_order_reminders.log 2>&1" > order_reminders_crontab.txt
+printf "0 8 * * * cd /home/abuaminuu/machine/alx_travel_app_0x02 && /usr/bin/python3 alx-backend-graphql_crm/crm/cron_jobs/send_order_reminders.py >> /tmp/cron_order_reminders.log 2>&1" > order_reminders_crontab.txt
 
 # Verify the file
 cat order_reminders_crontab.txt
 echo ""  # Add newline for display only
 echo "Line count: $(wc -l < order_reminders_crontab.txt)"
+
+#orderreminderscrontab.txt contains exactly: 0 8 * * * /usr/bin/python3 /path/to/alx-backend-graphqlcrm/crm/cronjobs/sendorderreminders.py.
+#crm/cron_jobs/order_reminders_crontab.txt doesn't contain: ["alx-backend-graphql_crm/crm/cron_jobs/send_order_reminders.py"]
