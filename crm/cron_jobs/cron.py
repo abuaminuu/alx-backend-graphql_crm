@@ -10,6 +10,9 @@ from datetime import datetime
 import logging
 import json
 from typing import Dict, Any
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
+
 
 # Import gql library for GraphQL queries
 try:
