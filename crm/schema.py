@@ -362,6 +362,16 @@ class Query(graphene.ObjectType):
         
         return summary
 
+# query for w10 task 2 
+class Query1(graphene.ObjectType):
+    # Add hello field for health checks
+    hello = graphene.String(description="Health check endpoint")
+    
+    def resolve_hello(self, info):
+        return "CRM GraphQL API is healthy"
+    
+    # ... rest of your existing queries
+
 # --------------------------
 # Mutations
 # --------------------------
