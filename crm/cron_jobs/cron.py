@@ -1,9 +1,8 @@
 """
 crm/cron.py
 Heartbeat and maintenance cron jobs for CRM application
-crm/cron.py doesn't contain: ["from gql.transport.requests import RequestsHTTPTransport", "from gql import", "gql", "Client"]
+Using gql library for GraphQL queries
 """
-
 
 import os
 import sys
@@ -11,16 +10,14 @@ from datetime import datetime
 import logging
 import json
 from typing import Dict, Any
-from gql.transport.requests import RequestsHTTPTransport
-from gql import gql, Client
 
-
-# Optional: GraphQL health check imports
+# Import gql library for GraphQL queries
 try:
-    import requests
-    HAS_REQUESTS = True
+    from gql import gql, Client
+    from gql.transport.requests import RequestsHTTPTransport
+    HAS_GQL = True
 except ImportError:
-    HAS_REQUESTS = False
+    HAS_GQL = False
 
 # Setup logging
 def setup_cron_logger():
@@ -53,66 +50,88 @@ def setup_cron_logger():
     
     return logger
 
-def check_graphql_endpoint() -> Dict[str, Any]:
+def create_graphql_client() -> Client:
     """
-    Check if GraphQL endpoint is responsive
+    Create and return a GraphQL client using gql library
+    """
+    try:
+        # Configure HTTP transport for GraphQL
+        transport = RequestsHTTPTransport(
+            url="http://localhost:8000/graphql",
+            use_json=True,
+            headers={
+                "Content-Type": "application/json",
+            },
+            verify=True,
+            retries=3,
+        )
+        
+        # Create client
+        client = Client(
+            transport=transport,
+            fetch_schema_from_transport=True,
+        )
+        
+        return client
+        
+    except Exception as e:
+        raise Exception(f"Failed to create GraphQL client: {str(e)}")
+
+def query_graphql_hello() -> Dict[str, Any]:
+    """
+    Query the GraphQL hello field to verify endpoint responsiveness
     Returns health status and response time
     """
-    if not HAS_REQUESTS:
-        return {"status": "skipped", "reason": "requests not installed"}
+    if not HAS_GQL:
+        return {"status": "skipped", "reason": "gql library not installed"}
+    
+    import time
     
     try:
-        import time
         start_time = time.time()
         
-        # Simple GraphQL query to check health
-        query = """
+        # Create GraphQL client
+        client = create_graphql_client()
+        
+        # Define the GraphQL query for hello field
+        query_string = """
         query {
-          __schema {
-            types {
-              name
-            }
-          }
+          hello
         }
         """
         
-        # Alternative: Query your hello field if it exists
-        # query = "{ hello }"
-        
-        response = requests.post(
-            "http://localhost:8000/graphql",
-            json={"query": query},
-            headers={"Content-Type": "application/json"},
-            timeout=5  # 5 second timeout
-        )
+        # Execute query
+        query = gql(query_string)
+        result = client.execute(query)
         
         response_time = round((time.time() - start_time) * 1000, 2)  # ms
         
-        if response.status_code == 200:
+        # Check if hello field exists in response
+        if 'hello' in result:
             return {
                 "status": "healthy",
                 "response_time_ms": response_time,
-                "status_code": response.status_code
+                "message": result['hello']
             }
         else:
             return {
                 "status": "unhealthy",
                 "response_time_ms": response_time,
-                "status_code": response.status_code,
-                "error": f"HTTP {response.status_code}"
+                "error": "hello field not in response",
+                "response": result
             }
             
-    except requests.exceptions.ConnectionError:
-        return {"status": "unhealthy", "error": "Connection refused"}
-    except requests.exceptions.Timeout:
-        return {"status": "unhealthy", "error": "Timeout"}
     except Exception as e:
-        return {"status": "unhealthy", "error": str(e)}
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
 
 def log_crm_heartbeat():
     """
     Heartbeat function that runs every 5 minutes
-    Logs CRM health status including GraphQL endpoint check
+    Logs CRM health status including GraphQL endpoint check using gql library
     """
     logger = setup_cron_logger()
     
@@ -123,25 +142,39 @@ def log_crm_heartbeat():
         # Basic heartbeat message
         base_message = f"{current_time} CRM is alive"
         
-        # Check GraphQL endpoint if requests is available
-        graphql_status = check_graphql_endpoint()
+        # Check GraphQL endpoint using gql library
+        graphql_status = query_graphql_hello()
         
         if graphql_status["status"] == "healthy":
-            # Add GraphQL response time to log
+            # Add GraphQL response time and message to log
             response_time = graphql_status.get("response_time_ms", "N/A")
-            full_message = f"{base_message} | GraphQL: OK ({response_time}ms)"
+            hello_message = graphql_status.get("message", "")
+            full_message = f"{base_message} | GraphQL: OK ({response_time}ms) - '{hello_message}'"
+            
         elif graphql_status["status"] == "skipped":
-            full_message = f"{base_message} | GraphQL: Check skipped (install requests)"
+            full_message = f"{base_message} | GraphQL: Check skipped - install gql library"
+            
         else:
             error_msg = graphql_status.get("error", "Unknown error")
+            error_type = graphql_status.get("error_type", "")
+            
+            if error_type:
+                error_msg = f"{error_type}: {error_msg}"
+                
             full_message = f"{base_message} | GraphQL: DOWN - {error_msg}"
         
         # Log the heartbeat
         logger.info(full_message)
         
-        # Optional: Log additional system info
-        log_system_info(logger)
-        
+        # Optional: Log system info (without breaking the required format)
+        try:
+            import psutil
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            memory = psutil.virtual_memory()
+            logger.info(f"System Info | CPU: {cpu_percent}% | Memory: {memory.percent}%")
+        except ImportError:
+            pass  # psutil not installed, skip system info
+            
         return True
         
     except Exception as e:
@@ -149,82 +182,136 @@ def log_crm_heartbeat():
         logger.error(error_message)
         return False
 
-def log_system_info(logger: logging.Logger):
-    """Log additional system information (optional)"""
-    try:
-        import psutil
-        import django
-        
-        # CPU and memory usage
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        memory = psutil.virtual_memory()
-        
-        # Django info
-        django_version = django.get_version()
-        
-        logger.info(f"System Info | CPU: {cpu_percent}% | Memory: {memory.percent}% | Django: {django_version}")
-        
-    except ImportError:
-        # psutil not installed, skip system info
-        pass
-    except Exception:
-        # Silent fail for optional system info
-        pass
+# Alternative GraphQL query methods for flexibility
 
-# Additional cron jobs can be added below
-
-def check_database_health():
-    """Optional: Check database connectivity"""
-    logger = setup_cron_logger()
+def query_graphql_schema():
+    """
+    Alternative method: Query GraphQL schema to verify endpoint
+    This doesn't require a specific 'hello' field
+    """
+    if not HAS_GQL:
+        return {"status": "skipped", "reason": "gql library not installed"}
+    
+    import time
     
     try:
-        from django.db import connection
-        from django.db.utils import OperationalError
+        start_time = time.time()
         
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-            
-        if result and result[0] == 1:
-            logger.info("Database connection: OK")
-            return True
+        # Create GraphQL client
+        client = create_graphql_client()
+        
+        # Query the schema (works even without hello field)
+        query_string = """
+        query {
+          __schema {
+            queryType {
+              name
+            }
+          }
+        }
+        """
+        
+        # Execute query
+        query = gql(query_string)
+        result = client.execute(query)
+        
+        response_time = round((time.time() - start_time) * 1000, 2)  # ms
+        
+        if '__schema' in result:
+            return {
+                "status": "healthy",
+                "response_time_ms": response_time,
+                "schema_exists": True
+            }
         else:
-            logger.error("Database connection: Unexpected response")
-            return False
+            return {
+                "status": "unhealthy",
+                "response_time_ms": response_time,
+                "error": "Schema query failed",
+                "response": result
+            }
             
-    except OperationalError as e:
-        logger.error(f"Database connection FAILED: {str(e)}")
-        return False
     except Exception as e:
-        logger.error(f"Database check error: {str(e)}")
-        return False
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
 
-def cleanup_temp_files():
-    """Optional: Clean up temporary files older than 7 days"""
+def test_all_graphql_endpoints():
+    """
+    Comprehensive GraphQL endpoint testing
+    Tries multiple queries to ensure endpoint is fully responsive
+    """
     logger = setup_cron_logger()
     
+    tests = [
+        ("Hello field", query_graphql_hello),
+        ("Schema query", query_graphql_schema),
+    ]
+    
+    all_passed = True
+    results = []
+    
+    for test_name, test_function in tests:
+        result = test_function()
+        results.append((test_name, result))
+        
+        if result["status"] != "healthy":
+            all_passed = False
+    
+    # Log results
+    current_time = datetime.now().strftime('%d/%m/%Y-%H:%M:%S')
+    
+    if all_passed:
+        logger.info(f"{current_time} All GraphQL tests PASSED")
+    else:
+        logger.warning(f"{current_time} Some GraphQL tests FAILED")
+        
+    for test_name, result in results:
+        status = "✓" if result["status"] == "healthy" else "✗"
+        logger.info(f"  {status} {test_name}: {result.get('message', result.get('error', 'No details'))}")
+    
+    return all_passed
+
+# Additional utility function for manual testing
+def manual_graphql_test():
+    """
+    Manual test function that can be called from Django shell
+    """
+    print("Testing GraphQL endpoint with gql library...")
+    
+    # Check if gql is installed
+    if not HAS_GQL:
+        print("ERROR: gql library not installed.")
+        print("Install it with: pip install gql")
+        return False
+    
     try:
-        import os
-        import time
-        from datetime import datetime, timedelta
+        # Test 1: Hello field
+        print("\n1. Testing hello field query:")
+        hello_result = query_graphql_hello()
+        print(f"   Status: {hello_result['status']}")
         
-        temp_dir = '/tmp'
-        cutoff_time = time.time() - (7 * 24 * 60 * 60)  # 7 days in seconds
-        deleted_count = 0
+        if hello_result['status'] == 'healthy':
+            print(f"   Response: {hello_result.get('message', 'No message')}")
+            print(f"   Time: {hello_result.get('response_time_ms', 'N/A')}ms")
+        else:
+            print(f"   Error: {hello_result.get('error', 'Unknown error')}")
         
-        for filename in os.listdir(temp_dir):
-            if filename.startswith('crm_') or filename.startswith('payment_'):
-                filepath = os.path.join(temp_dir, filename)
-                
-                if os.path.isfile(filepath):
-                    file_mtime = os.path.getmtime(filepath)
-                    
-                    if file_mtime < cutoff_time:
-                        os.remove(filepath)
-                        deleted_count += 1
+        # Test 2: Schema query (fallback)
+        print("\n2. Testing schema query:")
+        schema_result = query_graphql_schema()
+        print(f"   Status: {schema_result['status']}")
         
-        if deleted_count > 0:
-            logger.info(f"Cleaned up {deleted_count} old temporary files")
-            
+        if schema_result['status'] == 'healthy':
+            print(f"   Schema accessible: Yes")
+            print(f"   Time: {schema_result.get('response_time_ms', 'N/A')}ms")
+        else:
+            print(f"   Error: {schema_result.get('error', 'Unknown error')}")
+        
+        return hello_result['status'] == 'healthy' or schema_result['status'] == 'healthy'
+        
     except Exception as e:
-        logger.error(f"Cleanup failed: {str(e)}")
+        print(f"ERROR during test: {str(e)}")
+        return False
