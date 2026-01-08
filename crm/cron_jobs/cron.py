@@ -1,3 +1,5 @@
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 import os
 import sys
 from datetime import datetime
@@ -6,8 +8,6 @@ import json
 from typing import Dict, Any
 
 # REQUIRED: gql imports at the TOP LEVEL (not inside try-except)
-from gql import gql, Client
-from gql.transport.requests import RequestsHTTPTransport
 
 # Setup logging
 def setup_cron_logger():

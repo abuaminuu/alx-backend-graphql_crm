@@ -1,3 +1,4 @@
 graphene-django
 django-filter
 django-crontab
+gql

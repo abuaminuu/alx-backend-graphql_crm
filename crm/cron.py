@@ -2,7 +2,8 @@
 crm/cron.py
 Heartbeat and maintenance cron jobs for CRM application
 """
-
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 import os
 import sys
 from datetime import datetime
