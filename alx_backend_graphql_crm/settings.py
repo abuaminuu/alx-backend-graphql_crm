@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
+    'django_crontabs',
 ]
 
 GRAPHENE = {
@@ -125,3 +125,22 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+# Add CRONJOBS configuration at the bottom of settings.py
+CRONJOBS = [
+    # Run heartbeat every 5 minutes
+    ('*/5 * * * *', 'crm.cron.log_crm_heartbeat'),
+    ('0 */12 * * *', 'crm.cron.update_low_stock'),
+
+    # Optional: You can add more cron jobs here
+    # ('0 0 * * *', 'crm.cron.daily_backup'),  # Daily backup at midnight
+    # ('0 2 * * 0', 'crm.cron.weekly_reports'),  # Weekly reports on Sunday 2 AM
+]
+
+# Optional: Where to store cron logs
+CRONTAB_COMMAND_PREFIX = 'cd /home/abuaminuu/machine/alx_travel_app_0x02 && '
+CRONTAB_COMMAND_SUFFIX = '2>&1'
+
+# If you want to use a different Python interpreter
+# CRONTAB_PYTHON_EXECUTABLE = '/usr/bin/python3'
