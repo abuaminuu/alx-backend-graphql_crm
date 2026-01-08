@@ -224,3 +224,203 @@ def cleanup_temp_files():
             
     except Exception as e:
         logger.error(f"Cleanup failed: {str(e)}")
+
+"""
+crm/cron.py
+Cron jobs for CRM application including low-stock updates
+"""
+
+from datetime import datetime
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
+import logging
+import sys
+
+def setup_low_stock_logger():
+    """Setup logger for low-stock updates"""
+    logger = logging.getLogger('low_stock_cron')
+    logger.setLevel(logging.INFO)
+    
+    # Clear existing handlers
+    logger.handlers.clear()
+    
+    # File handler for low-stock updates
+    file_handler = logging.FileHandler('/tmp/low_stock_updates_log.txt', mode='a')
+    file_handler.setLevel(logging.INFO)
+    
+    # Formatter with timestamp
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    
+    logger.addHandler(file_handler)
+    
+    # Also log to console for debugging
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_formatter = logging.Formatter('%(message)s')
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+def update_low_stock():
+    """
+    Cron job that runs every 12 hours
+    Executes GraphQL mutation to update low-stock products
+    """
+    logger = setup_low_stock_logger()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    logger.info("=" * 60)
+    logger.info(f"LOW STOCK UPDATE STARTED - {timestamp}")
+    logger.info("=" * 60)
+    
+    try:
+        # Create GraphQL client
+        transport = RequestsHTTPTransport(
+            url="http://localhost:8000/graphql",
+            use_json=True,
+            headers={"Content-Type": "application/json"},
+            verify=True,
+            retries=3,
+        )
+        
+        client = Client(
+            transport=transport,
+            fetch_schema_from_transport=True,
+        )
+        
+        # Define the GraphQL mutation
+        mutation_string = """
+        mutation UpdateLowStock($increment: Int, $threshold: Int) {
+          updateLowStockProducts(
+            increment: $increment, 
+            threshold: $threshold
+          ) {
+            updatedProducts {
+              id
+              name
+              stock
+              price
+            }
+            message
+            count
+          }
+        }
+        """
+        
+        # Execute mutation with variables
+        mutation = gql(mutation_string)
+        
+        # You can customize these values
+        variables = {
+            "increment": 10,      # Add 10 to stock
+            "threshold": 10       # Products with stock < 10
+        }
+        
+        result = client.execute(mutation, variable_values=variables)
+        
+        # Extract data from result
+        mutation_result = result.get('updateLowStockProducts', {})
+        updated_products = mutation_result.get('updatedProducts', [])
+        message = mutation_result.get('message', 'No message returned')
+        count = mutation_result.get('count', 0)
+        
+        # Log the result
+        logger.info(f"Mutation Result: {message}")
+        logger.info(f"Products Updated: {count}")
+        
+        if count > 0:
+            logger.info("-" * 40)
+            logger.info("Updated Products:")
+            logger.info("-" * 40)
+            
+            for product in updated_products:
+                logger.info(f"  • {product['name']}: Now has {product['stock']} units (${product['price']})")
+        
+        logger.info("=" * 60)
+        logger.info(f"LOW STOCK UPDATE COMPLETED - {timestamp}")
+        logger.info("=" * 60)
+        
+        return True
+        
+    except Exception as e:
+        error_message = f"ERROR during low-stock update: {str(e)}"
+        logger.error(error_message)
+        return False
+
+# Alternative: Simple version using requests library
+def update_low_stock_simple():
+    """
+    Alternative implementation using requests library
+    """
+    import requests
+    import json
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file = "/tmp/low_stock_updates_log.txt"
+    
+    # GraphQL mutation
+    mutation = """
+    mutation {
+      updateLowStockProducts {
+        updatedProducts {
+          id
+          name
+          stock
+        }
+        message
+        count
+      }
+    }
+    """
+    
+    try:
+        response = requests.post(
+            "http://localhost:8000/graphql",
+            json={"query": mutation},
+            headers={"Content-Type": "application/json"},
+            timeout=30
+        )
+        
+        response.raise_for_status()
+        data = response.json()
+        
+        # Check for GraphQL errors
+        if 'errors' in data:
+            error_msg = data['errors'][0]['message'] if data['errors'] else 'Unknown error'
+            with open(log_file, 'a') as f:
+                f.write(f"{timestamp} - GraphQL Error: {error_msg}\n")
+            return False
+        
+        # Extract mutation result
+        result = data.get('data', {}).get('updateLowStockProducts', {})
+        message = result.get('message', '')
+        count = result.get('count', 0)
+        updated_products = result.get('updatedProducts', [])
+        
+        # Log to file
+        with open(log_file, 'a') as f:
+            f.write(f"{timestamp} - {message}\n")
+            
+            if count > 0:
+                f.write(f"{timestamp} - Updated {count} product(s):\n")
+                for product in updated_products:
+                    f.write(f"{timestamp} - • {product['name']}: stock = {product['stock']}\n")
+            else:
+                f.write(f"{timestamp} - No products needed restocking\n")
+        
+        return True
+        
+    except requests.exceptions.ConnectionError:
+        with open(log_file, 'a') as f:
+            f.write(f"{timestamp} - ERROR: Cannot connect to GraphQL endpoint\n")
+        return False
+    except requests.exceptions.Timeout:
+        with open(log_file, 'a') as f:
+            f.write(f"{timestamp} - ERROR: Request timeout\n")
+        return False
+    except Exception as e:
+        with open(log_file, 'a') as f:
+            f.write(f"{timestamp} - ERROR: {str(e)}\n")
+        return False

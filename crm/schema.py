@@ -6,14 +6,79 @@ from graphene_django.filter import DjangoFilterConnectionField
 from django.db.models import Q, Count, Sum
 from django.utils import timezone
 from datetime import timedelta
-
 from .models import Customer, Product, Order
 from .filters import CustomerFilter, ProductFilter, OrderFilter
 from .inputs import CustomerFilterInput, ProductFilterInput, OrderFilterInput
+from django.db import transaction
+from graphql import GraphQLError
+
 from .mutations import (
     CreateCustomer, BulkCreateCustomers,
     CreateProduct, CreateOrder
 )
+
+# In crm/schema.py - Add to your existing mutations
+
+class UpdateLowStockProducts(graphene.Mutation):
+    """Mutation to automatically restock products with low inventory"""
+    
+    class Arguments:
+        increment = graphene.Int(
+            description="Amount to add to low-stock products",
+            default_value=10
+        )
+        threshold = graphene.Int(
+            description="Stock level considered 'low'",
+            default_value=10
+        )
+    
+    # Output fields
+    updated_products = graphene.List(
+        graphene.NonNull('crm.schema.ProductType'),
+        description="List of products that were updated"
+    )
+    message = graphene.String(description="Result message")
+    count = graphene.Int(description="Number of products updated")
+    
+    @classmethod
+    @transaction.atomic
+    def mutate(cls, root, info, increment=10, threshold=10):
+        try:
+            # Get current user from context (optional)
+            user = info.context.user if info.context.user.is_authenticated else None
+            
+            # Find products with stock below threshold
+            low_stock_products = Product.objects.filter(stock__lt=threshold)
+            
+            if not low_stock_products.exists():
+                return UpdateLowStockProducts(
+                    updated_products=[],
+                    message=f"No products found with stock less than {threshold}",
+                    count=0
+                )
+            
+            # Update each product's stock
+            updated_products_list = []
+            for product in low_stock_products:
+                old_stock = product.stock
+                product.stock += increment
+                product.save()
+                
+                # Add to return list
+                updated_products_list.append(product)
+                
+                # Optional: Log the update (could be moved to signals)
+                # print(f"Updated {product.name}: {old_stock} -> {product.stock}")
+            
+            # Return success
+            return UpdateLowStockProducts(
+                updated_products=updated_products_list,
+                message=f"Successfully restocked {len(updated_products_list)} products",
+                count=len(updated_products_list)
+            )
+            
+        except Exception as e:
+            raise GraphQLError(f"Failed to update low-stock products: {str(e)}")
 
 
 class CreateCustomer(graphene.Mutation):
