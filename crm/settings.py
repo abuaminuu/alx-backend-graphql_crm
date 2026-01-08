@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_crontabs',
+    'django_celery_beat',
+    'django_celery_results',
 ]
 
 GRAPHENE = {
@@ -143,3 +145,41 @@ CRONTAB_COMMAND_SUFFIX = '2>&1'
 
 # If you want to use a different Python interpreter
 # CRONTAB_PYTHON_EXECUTABLE = '/usr/bin/python3'
+# Celery Beat Schedule
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'generate-crm-report': {
+        'task': 'crm.tasks.generate_crm_report',
+        'schedule': crontab(day_of_week='mon', hour=6, minute=0),  # Every Monday at 6 AM
+        'args': (),  # No arguments
+        'kwargs': {},  # No keyword arguments
+    },
+    # Optional: Daily summary
+    'daily-summary': {
+        'task': 'crm.tasks.generate_daily_summary',
+        'schedule': crontab(hour=23, minute=30),  # Daily at 11:30 PM
+    },
+}
+
+
+# Celery Configuration
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'  # Or your timezone
+CELERY_ENABLE_UTC = True
+
+
+# Cache configuration (optional, improves performance)
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://localhost:6379/1',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
