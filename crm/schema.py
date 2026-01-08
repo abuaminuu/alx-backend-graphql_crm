@@ -11,6 +11,7 @@ from .filters import CustomerFilter, ProductFilter, OrderFilter
 from .inputs import CustomerFilterInput, ProductFilterInput, OrderFilterInput
 from django.db import transaction
 from graphql import GraphQLError
+from crm.models import Product
 
 from .mutations import (
     CreateCustomer, BulkCreateCustomers,
